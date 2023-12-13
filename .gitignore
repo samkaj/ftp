@@ -1,0 +1,23 @@
+# CMake build directory
+build/
+
+# CMake cache and temporary files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.make
+*.cmake
+
+# Object files and static libraries
+*.o
+*.a
+*.lo
+
+# Compiled binary
+/bin/
+/*/bin/
+/lib/
+/*/lib/
+
+ftp
