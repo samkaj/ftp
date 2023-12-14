@@ -1,10 +1,14 @@
+#include "command.h"
+#include "request.h"
 #include <iostream>
+#include <string>
 
-void read_stdin()
+void read_commands()
 {
-    std::string line;
+    std::string line{};
     while (std::getline(std::cin, line)) {
-        std::cout << line << std::endl;
+        Request request(line);
+        std::cout << command_to_string(request.command) << std::endl;
         std::cout << "> ";
     }
 }
@@ -12,6 +16,6 @@ void read_stdin()
 int main()
 {
     std::cout << "> ";
-    read_stdin();
+    read_commands();
     return 0;
 }
