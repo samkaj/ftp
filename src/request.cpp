@@ -3,12 +3,12 @@
 #include <string>
 #include <vector>
 
-Request::Request(std::string user_input)
+Request::Request(std::string const& user_input)
 {
     parse_command_and_args(user_input);
 }
 
-void Request::parse_command_and_args(std::string user_input)
+void Request::parse_command_and_args(std::string const& user_input)
 {
     size_t i = user_input.find(' ');
     if (i == std::string::npos) {
