@@ -2,6 +2,7 @@
 #include <iostream>
 #include <string>
 
+// Print usage information.
 void usage()
 {
     std::cout << "Usage: ftp <command> params [params ...]\n\n";
@@ -17,11 +18,13 @@ void usage()
 // Parse args and call the appropriate function, then exit.
 int main(int argc, char* argv[])
 {
+    // Check for args.
     if (argc < 2) {
         usage();
         return 1;
     }
 
+    // Build string representation of provided args.
     std::string user_input;
     for (int i = 1; i < argc; ++i) {
         user_input += argv[i];
@@ -30,6 +33,13 @@ int main(int argc, char* argv[])
         }
     }
 
+    // Check for help flag.
+    if (user_input == "-h" || user_input == "--help") {
+        usage();
+        return 0;
+    }
+
+    // Execute command and catch any errors.
     try {
         Client client { user_input };
     } catch (char const* msg) {
