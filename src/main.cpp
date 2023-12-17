@@ -1,25 +1,40 @@
-#include "command.h"
-#include "request.h"
+#include "client.h"
 #include <iostream>
 #include <string>
 
-void read_commands()
+void usage()
 {
-    std::string line{};
-    while (std::getline(std::cin, line)) {
-        if (line.empty()) {
-            std::cout << "> ";
-            continue;
-        }
-        Request request(line);
-        std::cout << command_to_string(request.command) << std::endl;
-        std::cout << "> ";
-    }
+    std::cout << "Usage: ftp <command> params [params ...]\n\n";
+    std::cout << "List of commands:\n\n";
+    std::cout << "ls <url>        \tPrint directory contents from the FTP server\n";
+    std::cout << "mkdir <url>     \tCreate a new directory at the given path on the FTP server\n";
+    std::cout << "rm <url>        \tDelete the file at the given path specified in the FTP url\n";
+    std::cout << "rmdir <url>     \tDelete the directory at the given path specified in the FTP url\n";
+    std::cout << "cp <arg1> <arg2>\tCopy the file to either the client or the server\n";
+    std::cout << "mv <arg1> <arg2>\tMove the file to either the client or the server\n";
 }
 
-int main()
+// Parse args and call the appropriate function, then exit.
+int main(int argc, char* argv[])
 {
-    std::cout << "> ";
-    read_commands();
+    if (argc < 2) {
+        usage();
+        return 1;
+    }
+
+    std::string user_input;
+    for (int i = 1; i < argc; ++i) {
+        user_input += argv[i];
+        if (i < argc - 1) {
+            user_input += ' ';
+        }
+    }
+
+    try {
+        Client client { user_input };
+    } catch (char const* msg) {
+        std::cerr << "Failed to execute command: " << msg << "\n\n";
+        usage();
+    }
     return 0;
 }
