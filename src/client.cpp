@@ -1,6 +1,13 @@
 #include "client.h"
 #include "url.h"
+#include <arpa/inet.h>
+#include <iostream>
+#include <netinet/in.h>
+#include <string.h>
 #include <string>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <unistd.h>
 #include <vector>
 
 Client::Client(std::vector<std::string> args)
@@ -31,9 +38,79 @@ void Client::parse_user_input(std::vector<std::string> args)
     }
 }
 
-void Client::ls(std::string const& external_path) { }
-void Client::mkdir(std::string const& external_path) { }
-void Client::rm(std::string const& external_filepath) { }
-void Client::rmdir(std::string const& external_path) { }
-void Client::cp(std::string const& filepath, std::string const& external_path) { }
-void Client::mv(std::string const& filepath, std::string const& external_path) { }
+void Client::connect_to_server()
+{
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0) {
+        throw "failed to open socket";
+    }
+
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = port;
+    addr.sin_addr.s_addr = inet_addr("127.0.0.1"); // FIXME: resolve ip
+
+    if (connect(sockfd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
+        close(sockfd);
+        throw "failed to connect to FTP server";
+    }
+
+    ftp_user(sockfd);
+    ftp_pass(sockfd);
+    ftp_type(sockfd);
+    ftp_mode(sockfd);
+    ftp_stru(sockfd);
+
+    // send operation
+
+    // send EXIT
+    ftp_quit(sockfd);
+    close(sockfd);
+}
+
+
+void Client::ftp_command(int sockfd, std::string const& command, std::string const& error_msg)
+{
+    std::string msg = command + "\r\n";
+    send(sockfd, msg.c_str(), msg.length(), 0);
+
+    char buffer[1024];
+    recv(sockfd, buffer, 1024, 0);
+    if (buffer[0] != '2' || buffer[0] != '3') {
+        ftp_quit(sockfd);
+        throw error_msg;
+    }
+
+    memset(buffer, 0, sizeof(buffer));
+}
+
+void Client::ftp_user(int sockfd)
+{
+    ftp_command(sockfd, "USER " + username, "failed to send USER");
+}
+
+void Client::ftp_pass(int sockfd)
+{
+    ftp_command(sockfd, "PASS " + password, "failed to send PASS");
+}
+
+void Client::ftp_type(int sockfd)
+{
+    ftp_command(sockfd, "TYPE I", "failed to send TYPE");
+}
+
+void Client::ftp_mode(int sockfd)
+{
+    ftp_command(sockfd, "MODE S", "failed to send MODE");
+}
+
+void Client::ftp_stru(int sockfd)
+{
+    ftp_command(sockfd, "STRU F", "failed to send STRU");
+}
+
+void Client::ftp_quit(int sockfd)
+{
+    ftp_command(sockfd, "QUIT", "failed to send QUIT");
+}
