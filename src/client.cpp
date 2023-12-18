@@ -37,17 +37,3 @@ void Client::rm(std::string const& external_filepath) { }
 void Client::rmdir(std::string const& external_path) { }
 void Client::cp(std::string const& filepath, std::string const& external_path) { }
 void Client::mv(std::string const& filepath, std::string const& external_path) { }
-
-std::vector<std::string> split(std::string const& s, char delim)
-{
-    std::vector<std::string> tokens;
-    size_t start { 0 };
-    size_t end { 0 };
-    while ((end = s.find(delim, start)) != std::string::npos) {
-        tokens.push_back(s.substr(start, end - start));
-        start = end + 1;
-    }
-    tokens.push_back(s.substr(start));
-
-    return tokens;
-}
