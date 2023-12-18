@@ -12,6 +12,7 @@
 
 Client::Client(std::vector<std::string> args)
 {
+    std::cout << "Creating client\n";
     parse_user_input(args);
 }
 
@@ -19,11 +20,20 @@ Client::Client(std::vector<std::string> args)
 // the client finds the operation, host, username, password, port, and external path.
 void Client::parse_user_input(std::vector<std::string> args)
 {
-    operation = { args[0] };
+    if (args.empty()) {
+        throw std::runtime_error("no operation specified");
+    }
+
+    operation = args[0];
     args.erase(args.begin());
-    params = args;
-    std::string url = url::is_url(params[0]) && params.size() > 0 ? params[0] : params[1];
-    if (!url::is_url(url)) {
+    if (args.empty()) {
+        throw "no url specified";
+    }
+
+    std::string url = args[0];
+    std::cout << "Parsing url: " << url << "\n";
+    if (url == "" || !url::is_url(url)) {
+        std::cerr << "invalid url: \"" << url << "\"\n";
         throw "invalid url";
     }
 
@@ -31,7 +41,7 @@ void Client::parse_user_input(std::vector<std::string> args)
     username = url::parse_user(url);
     password = url::parse_pass(url);
     external_path = url::parse_path(url);
-    port = std::stoi(url::parse_port(url));
+    port = std::stoi(url::parse_port(url).substr(1));
 
     if (host == "" || external_path == "") {
         throw "invalid url, host and path are required";
@@ -40,48 +50,52 @@ void Client::parse_user_input(std::vector<std::string> args)
 
 void Client::send_command()
 {
-    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0) {
+    std::cout << "Sending command\n";
+    int control_channel_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (control_channel_fd < 0) {
         throw "failed to open socket";
     }
 
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
-    addr.sin_port = port;
-    addr.sin_addr.s_addr = inet_addr("127.0.0.1"); // FIXME: resolve ip
+    addr.sin_port = htons(port);
+    addr.sin_addr.s_addr = inet_addr(host.c_str());
 
-    if (connect(sockfd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
-        close(sockfd);
-        throw "failed to connect to FTP server";
+    std::cout << "Connecting to " << host << ":" << port << "\n";
+    if (connect(control_channel_fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
+        close(control_channel_fd);
+        std::cerr << strerror(errno) << "\n";
+        throw "failed to connect to server";
     }
 
-    ftp_user(sockfd);
-    ftp_pass(sockfd);
-    ftp_type(sockfd);
-    ftp_mode(sockfd);
-    ftp_stru(sockfd);
+    ftp_user(control_channel_fd);
+    ftp_pass(control_channel_fd);
+    ftp_type(control_channel_fd);
+    ftp_mode(control_channel_fd);
+    ftp_stru(control_channel_fd);
 
-    // send operation
+    // TODO: send operation
 
-    // send EXIT
-    ftp_quit(sockfd);
-    close(sockfd);
+    ftp_quit(control_channel_fd);
+    close(control_channel_fd);
 }
-
 
 void Client::ftp_command(int sockfd, std::string const& command, std::string const& error_msg)
 {
+    std::cout << "Sending " << command << " to FTP server\n";
     std::string msg = command + "\r\n";
     send(sockfd, msg.c_str(), msg.length(), 0);
 
     char buffer[1024];
     recv(sockfd, buffer, 1024, 0);
-    if (buffer[0] != '2' || buffer[0] != '3') {
+    if (buffer[0] != '2' && buffer[0] != '3') {
         ftp_quit(sockfd);
         throw error_msg;
     }
 
+    std::string response(buffer);
+    std::cout << "Response: " << response << "\n";
     memset(buffer, 0, sizeof(buffer));
 }
 

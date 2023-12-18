@@ -1,4 +1,5 @@
 #include "url.h"
+#include <iostream>
 #include <regex>
 #include <string>
 

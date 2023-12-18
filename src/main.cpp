@@ -25,12 +25,12 @@ int main(int argc, char* argv[])
     }
     // Execute command and catch any errors.
     std::vector<std::string> args { argv + 1, argv + argc };
-    std::cout << args[0] << "\n";
     try {
         Client client { args };
+        client.send_command();
     } catch (char const* msg) {
         std::cerr << "Failed to execute command: " << msg << "\n\n";
-        usage();
+        //usage();
     }
     return 0;
 }

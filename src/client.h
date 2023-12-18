@@ -17,6 +17,7 @@ private:
     std::string external_path;
     std::vector<std::string> params;
     void parse_user_input(std::vector<std::string> args);
+    void ls();
     void ftp_user(int sockfd);
     void ftp_pass(int sockfd);
     void ftp_type(int sockfd);
