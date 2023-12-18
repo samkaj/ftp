@@ -3,21 +3,15 @@
 #include <string>
 #include <vector>
 
-Client::Client(std::string const& user_input)
+Client::Client(std::vector<std::string> args)
 {
-    parse_user_input(user_input);
+    parse_user_input(args);
 }
 
 // Build the client object from the user input. Based on the user input,
 // the client finds the operation, host, username, password, port, and external path.
-void Client::parse_user_input(std::string const& user_input)
+void Client::parse_user_input(std::vector<std::string> args)
 {
-    // FIXME: wait... are we parsing the string back to a vector?
-    std::vector<std::string> args { split(user_input, ' ') };
-    if (args.size() > 4 || args.size() < 2) {
-        throw "incorrect number of arguments supplied";
-    }
-
     operation = { args[0] };
     args.erase(args.begin());
     params = args;

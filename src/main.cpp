@@ -19,29 +19,15 @@ void usage()
 int main(int argc, char* argv[])
 {
     // Check for args.
-    if (argc < 2) {
+    if (argc < 3) {
         usage();
         return 1;
     }
-
-    // Build string representation of provided args.
-    std::string user_input;
-    for (int i = 1; i < argc; ++i) {
-        user_input += argv[i];
-        if (i < argc - 1) {
-            user_input += ' ';
-        }
-    }
-
-    // Check for help flag.
-    if (user_input == "-h" || user_input == "--help") {
-        usage();
-        return 0;
-    }
-
     // Execute command and catch any errors.
+    std::vector<std::string> args { argv + 1, argv + argc };
+    std::cout << args[0] << "\n";
     try {
-        Client client { user_input };
+        Client client { args };
     } catch (char const* msg) {
         std::cerr << "Failed to execute command: " << msg << "\n\n";
         usage();

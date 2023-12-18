@@ -5,7 +5,7 @@
 std::vector<std::string> split(std::string const& s, char delim);
 class Client {
 public:
-    Client(std::string const& user_input);
+    Client(std::vector<std::string> args);
     void ls(std::string const& external_path);
     void mkdir(std::string const& external_path);
     void rm(std::string const& external_filepath);
@@ -22,7 +22,7 @@ private:
     std::string password;
     std::string external_path;
     std::vector<std::string> params;
-    void parse_user_input(std::string const& user_input);
+    void parse_user_input(std::vector<std::string> args);
     void connect_to_server();
     void user(std::string const& username);
     void pass(std::string const& password);
