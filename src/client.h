@@ -5,7 +5,7 @@
 class Client {
 public:
     Client(std::vector<std::string> args);
-    void connect_to_server();
+    void send_command();
 
 private:
     int control_socket;

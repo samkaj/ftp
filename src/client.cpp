@@ -38,7 +38,7 @@ void Client::parse_user_input(std::vector<std::string> args)
     }
 }
 
-void Client::connect_to_server()
+void Client::send_command()
 {
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) {
