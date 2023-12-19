@@ -85,7 +85,8 @@ void Client::send_command()
 
 void Client::do_operation(int sockfd)
 {
-    if (operation == "mkdir") { }
+    if (operation == "mkdir")
+        mkdir();
 }
 
 void Client::ftp_control_command(std::string const& command, std::string const& error_msg)
@@ -96,14 +97,15 @@ void Client::ftp_control_command(std::string const& command, std::string const& 
 
     char buffer[1024];
     recv(control_socket, buffer, 1024, 0);
-    if (buffer[0] != '2' && buffer[0] != '3') {
-        ftp_quit();
-        throw error_msg;
-    }
 
     std::string response(buffer);
     std::cout << "Response: " << response << "\n";
     memset(buffer, 0, sizeof(buffer));
+}
+
+void Client::mkdir()
+{
+    ftp_control_command("MKD " + external_path, "failed to send MKD");
 }
 
 void Client::ftp_user()

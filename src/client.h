@@ -18,6 +18,7 @@ private:
     std::vector<std::string> params;
     void parse_user_input(std::vector<std::string> args);
     void do_operation(int sockfd);
+    void mkdir();
     void ftp_user();
     void ftp_pass();
     void ftp_type();
