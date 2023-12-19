@@ -1,7 +1,9 @@
 #include "client.h"
 #include "url.h"
 #include <arpa/inet.h>
+#include <functional>
 #include <iostream>
+#include <map>
 #include <netinet/in.h>
 #include <string.h>
 #include <string>
@@ -13,6 +15,10 @@
 Client::Client(std::vector<std::string> args)
 {
     std::cout << "Creating client\n";
+    operations = {
+        { "mkdir", [this]() { this->mkdir(); } },
+        { "rmdir", [this]() { this->rmdir(); } }
+    };
     parse_user_input(args);
 }
 
@@ -85,8 +91,12 @@ void Client::send_command()
 
 void Client::do_operation(int sockfd)
 {
-    if (operation == "mkdir")
-        mkdir();
+    auto it = operations.find(operation);
+    if (it != operations.end()) {
+        it->second();
+    } else {
+        std::cerr << "Received unknown operation: " << operation << ", ignoring\n" << std::endl;
+    }
 }
 
 void Client::ftp_control_command(std::string const& command, std::string const& error_msg)
@@ -96,16 +106,28 @@ void Client::ftp_control_command(std::string const& command, std::string const& 
     send(control_socket, msg.c_str(), msg.length(), 0);
 
     char buffer[1024];
-    recv(control_socket, buffer, 1024, 0);
+    int bytes_received = recv(control_socket, buffer, 1023, 0);
+
+    if (bytes_received < 0) {
+        std::cerr << "Error in receiving data: " << strerror(errno) << "\n";
+        throw std::runtime_error("Error in receiving data");
+    }
+
+    buffer[bytes_received] = '\0';
 
     std::string response(buffer);
     std::cout << "Response: " << response << "\n";
-    memset(buffer, 0, sizeof(buffer));
 }
+
 
 void Client::mkdir()
 {
     ftp_control_command("MKD " + external_path, "failed to send MKD");
+}
+
+void Client::rmdir()
+{
+    ftp_control_command("RMD " + external_path, "failed to send RMD");
 }
 
 void Client::ftp_user()
