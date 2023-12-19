@@ -56,6 +56,8 @@ void Client::send_command()
         throw "failed to open socket";
     }
 
+    control_socket = control_channel_fd;
+
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
@@ -69,28 +71,33 @@ void Client::send_command()
         throw "failed to connect to server";
     }
 
-    ftp_user(control_channel_fd);
-    ftp_pass(control_channel_fd);
-    ftp_type(control_channel_fd);
-    ftp_mode(control_channel_fd);
-    ftp_stru(control_channel_fd);
+    ftp_user();
+    ftp_pass();
+    ftp_type();
+    ftp_mode();
+    ftp_stru();
 
-    // TODO: send operation
+    do_operation(control_channel_fd);
 
-    ftp_quit(control_channel_fd);
+    ftp_quit();
     close(control_channel_fd);
 }
 
-void Client::ftp_command(int sockfd, std::string const& command, std::string const& error_msg)
+void Client::do_operation(int sockfd)
+{
+    if (operation == "mkdir") { }
+}
+
+void Client::ftp_control_command(std::string const& command, std::string const& error_msg)
 {
     std::cout << "Sending " << command << " to FTP server\n";
     std::string msg = command + "\r\n";
-    send(sockfd, msg.c_str(), msg.length(), 0);
+    send(control_socket, msg.c_str(), msg.length(), 0);
 
     char buffer[1024];
-    recv(sockfd, buffer, 1024, 0);
+    recv(control_socket, buffer, 1024, 0);
     if (buffer[0] != '2' && buffer[0] != '3') {
-        ftp_quit(sockfd);
+        ftp_quit();
         throw error_msg;
     }
 
@@ -99,32 +106,32 @@ void Client::ftp_command(int sockfd, std::string const& command, std::string con
     memset(buffer, 0, sizeof(buffer));
 }
 
-void Client::ftp_user(int sockfd)
+void Client::ftp_user()
 {
-    ftp_command(sockfd, "USER " + username, "failed to send USER");
+    ftp_control_command("USER " + username, "failed to send USER");
 }
 
-void Client::ftp_pass(int sockfd)
+void Client::ftp_pass()
 {
-    ftp_command(sockfd, "PASS " + password, "failed to send PASS");
+    ftp_control_command("PASS " + password, "failed to send PASS");
 }
 
-void Client::ftp_type(int sockfd)
+void Client::ftp_type()
 {
-    ftp_command(sockfd, "TYPE I", "failed to send TYPE");
+    ftp_control_command("TYPE I", "failed to send TYPE");
 }
 
-void Client::ftp_mode(int sockfd)
+void Client::ftp_mode()
 {
-    ftp_command(sockfd, "MODE S", "failed to send MODE");
+    ftp_control_command("MODE S", "failed to send MODE");
 }
 
-void Client::ftp_stru(int sockfd)
+void Client::ftp_stru()
 {
-    ftp_command(sockfd, "STRU F", "failed to send STRU");
+    ftp_control_command("STRU F", "failed to send STRU");
 }
 
-void Client::ftp_quit(int sockfd)
+void Client::ftp_quit()
 {
-    ftp_command(sockfd, "QUIT", "failed to send QUIT");
+    ftp_control_command("QUIT", "failed to send QUIT");
 }

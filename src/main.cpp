@@ -20,6 +20,7 @@ int main(int argc, char* argv[])
 {
     // Check for args.
     if (argc < 3) {
+        std::cerr << "Error: too few arguments\n\n";
         usage();
         return 1;
     }
@@ -30,7 +31,7 @@ int main(int argc, char* argv[])
         client.send_command();
     } catch (char const* msg) {
         std::cerr << "Failed to execute command: " << msg << "\n\n";
-        //usage();
+        // usage();
     }
     return 0;
 }
