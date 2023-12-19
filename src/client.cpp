@@ -96,7 +96,8 @@ void Client::do_operation(int sockfd)
     if (it != operations.end()) {
         it->second();
     } else {
-        std::cerr << "Received unknown operation: " << operation << ", ignoring\n" << std::endl;
+        std::cerr << "Received unknown operation: " << operation << ", ignoring\n"
+                  << std::endl;
     }
 }
 
@@ -119,7 +120,6 @@ void Client::ftp_control_command(std::string const& command, std::string const& 
     std::string response(buffer);
     std::cout << "Response: " << response << "\n";
 }
-
 
 void Client::mkdir()
 {
