@@ -5,6 +5,7 @@
 #include <iostream>
 #include <map>
 #include <netinet/in.h>
+#include <stdexcept>
 #include <string.h>
 #include <string>
 #include <sys/socket.h>
@@ -33,14 +34,14 @@ void Client::parse_user_input(std::vector<std::string> args)
     operation = args[0];
     args.erase(args.begin());
     if (args.empty()) {
-        throw "no url specified";
+        throw std::runtime_error("no url specified");
     }
 
     std::string url = args[0];
     std::cout << "Parsing url: " << url << "\n";
     if (url == "" || !url::is_url(url)) {
         std::cerr << "invalid url: \"" << url << "\"\n";
-        throw "invalid url";
+        throw std::runtime_error("invalid url");
     }
 
     host = url::parse_host(url);
@@ -50,7 +51,7 @@ void Client::parse_user_input(std::vector<std::string> args)
     port = std::stoi(url::parse_port(url).substr(1));
 
     if (host == "" || external_path == "") {
-        throw "invalid url, host and path are required";
+        throw std::runtime_error("invalid url, host and path are required");
     }
 }
 
@@ -59,7 +60,7 @@ void Client::send_command()
     std::cout << "Sending command\n";
     int control_channel_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (control_channel_fd < 0) {
-        throw "failed to open socket";
+        throw std::runtime_error("failed to open socket");
     }
 
     control_socket = control_channel_fd;
@@ -74,7 +75,7 @@ void Client::send_command()
     if (connect(control_channel_fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
         close(control_channel_fd);
         std::cerr << strerror(errno) << "\n";
-        throw "failed to connect to server";
+        throw std::runtime_error("failed to connect to host");
     }
 
     ftp_user();
@@ -110,7 +111,7 @@ void Client::ftp_control_command(std::string const& command, std::string const& 
 
     if (bytes_received < 0) {
         std::cerr << "Error in receiving data: " << strerror(errno) << "\n";
-        throw std::runtime_error("Error in receiving data");
+        throw std::runtime_error("error in receiving data");
     }
 
     buffer[bytes_received] = '\0';

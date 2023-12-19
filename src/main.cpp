@@ -1,5 +1,6 @@
 #include "client.h"
 #include <iostream>
+#include <stdexcept>
 #include <string>
 
 // Print usage information.
@@ -29,8 +30,8 @@ int main(int argc, char* argv[])
     try {
         Client client { args };
         client.send_command();
-    } catch (char const* msg) {
-        std::cerr << "Failed to execute command: " << msg << "\n\n";
+    } catch (std::runtime_error error) {
+        std::cerr << "Failed to execute command: " << error.what() << "\n\n";
         // usage();
     }
     return 0;
