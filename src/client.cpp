@@ -1,19 +1,10 @@
 #include "client.h"
 #include "url.h"
 #include <arpa/inet.h>
-#include <cstring>
-#include <functional>
 #include <iostream>
-#include <map>
-#include <netinet/in.h>
 #include <sstream>
-#include <stdexcept>
-#include <string.h>
 #include <string>
-#include <sys/socket.h>
-#include <sys/types.h>
 #include <unistd.h>
-#include <vector>
 
 Client::Client(std::vector<std::string> args)
 {
@@ -24,6 +15,27 @@ Client::Client(std::vector<std::string> args)
         { "ls", [this]() { this->ls(); } }
     };
     parse_user_input(args);
+}
+
+void Client::create_socket_and_connect(int& sockfd, std::string const& host, int port)
+{
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0) {
+        throw std::runtime_error("failed to open socket");
+    }
+
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    addr.sin_addr.s_addr = inet_addr(host.c_str());
+
+    std::cout << "Connecting to " << host << ":" << port << "\n";
+    if (connect(sockfd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
+        close(sockfd);
+        std::cerr << strerror(errno) << "\n";
+        throw std::runtime_error("failed to connect to host");
+    }
 }
 
 // Build the client object from the user input. Based on the user input,
@@ -58,51 +70,28 @@ void Client::parse_user_input(std::vector<std::string> args)
     }
 }
 
+void Client::receive_response(int sockfd, std::string& response)
+{
+    char buffer[1024];
+    int bytes_received = recv(sockfd, buffer, sizeof(buffer) - 1, 0);
+    if (bytes_received < 0) {
+        std::cerr << "Error in receiving data: " << strerror(errno) << "\n";
+        throw std::runtime_error("error in receiving data");
+    }
+    buffer[bytes_received] = '\0';
+    response = buffer;
+    std::cout << "Response: " << response << "\n";
+}
+
 void Client::ftp_connect_data_channel()
 {
-    int data_channel_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (data_channel_fd < 0) {
-        throw std::runtime_error("failed to open socket");
-    }
-
-    data_socket = data_channel_fd;
-
-    struct sockaddr_in addr;
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(data_port);
-    addr.sin_addr.s_addr = inet_addr(host.c_str());
-
-    std::cout << "Connecting to " << host << ":" << data_port << "\n";
-    if (connect(data_channel_fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
-        close(data_channel_fd);
-        std::cerr << strerror(errno) << "\n";
-        throw std::runtime_error("failed to connect to host");
-    }
+    create_socket_and_connect(data_socket, host, data_port);
 }
 
 void Client::send_command()
 {
     std::cout << "Sending command\n";
-    int control_channel_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (control_channel_fd < 0) {
-        throw std::runtime_error("failed to open socket");
-    }
-
-    control_socket = control_channel_fd;
-
-    struct sockaddr_in addr;
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(control_port);
-    addr.sin_addr.s_addr = inet_addr(host.c_str());
-
-    std::cout << "Connecting to " << host << ":" << control_port << "\n";
-    if (connect(control_channel_fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
-        close(control_channel_fd);
-        std::cerr << strerror(errno) << "\n";
-        throw std::runtime_error("failed to connect to host");
-    }
+    create_socket_and_connect(control_socket, host, control_port);
 
     ftp_user();
     ftp_pass();
@@ -110,10 +99,10 @@ void Client::send_command()
     ftp_mode();
     ftp_stru();
 
-    do_operation(control_channel_fd);
+    do_operation(control_socket);
 
     ftp_quit();
-    close(control_channel_fd);
+    close(control_socket);
 }
 
 void Client::do_operation(int sockfd)
@@ -132,32 +121,20 @@ void Client::ls()
     ftp_pasv(); // Send PASV which sets the port for the data channel
     ftp_command(control_socket, "LIST", "failed to send LIST");
     ftp_connect_data_channel();
-    char buffer[1024];
-    int bytes_received = recv(data_socket, buffer, 1023, 0);
-    buffer[bytes_received] = '\0';
-    std::string response(buffer);
-    std::cout << "Response: " << response << "\n";
+    std::string response;
+    receive_response(data_socket, response);
+    std::cout << response << "\n";
+    close(data_socket); // Ensure to close the data socket after use
 }
 
 void Client::ftp_pasv()
 {
     std::string msg = "PASV \r\n";
-    std::cout << msg << '\n';
+    std::cout << msg;
     send(control_socket, msg.c_str(), msg.length(), 0);
-    char buffer[1024];
-    int bytes_received = recv(control_socket, buffer, 1023, 0);
-    buffer[bytes_received] = '\0';
-    std::string response(buffer);
-    std::cout << "Response: " << response << "\n";
 
-    // Receive next line
-    char buffer2[1024];
-    int bytes_received2 = recv(control_socket, buffer2, 1023, 0);
-    buffer2[bytes_received2] = '\0';
-    response = buffer2;
-    std::cout << "Response: " << response << "\n";
-
-    // Find the port number.
+    std::string response;
+    receive_response(control_socket, response);
     data_port = parse_data_port(response);
     std::cout << "port: " << data_port << "\n";
 }
@@ -196,7 +173,6 @@ void Client::ftp_command(int sockfd, std::string const& command, std::string con
     send(sockfd, msg.c_str(), msg.length(), 0);
 
     char buffer[1024];
-    std::cout << sockfd << "<< fd\n";
     int bytes_received = recv(sockfd, buffer, 1023, 0);
 
     if (bytes_received < 0) {

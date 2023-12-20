@@ -22,7 +22,7 @@ private:
     std::vector<std::string> params;
     std::map<std::string, std::function<void()>> operations;
     void parse_user_input(std::vector<std::string> args);
-    int parse_data_port(const std::string &input);
+    int parse_data_port(std::string const& input);
     void do_operation(int sockfd);
     void mkdir();
     void ls();
@@ -34,7 +34,9 @@ private:
     void ftp_mode();
     void ftp_stru();
     void ftp_quit();
+    void create_socket_and_connect(int& sockfd, std::string const& host, int port);
     void ftp_control_command(std::string const& command, std::string const& error_msg);
     void ftp_command(int sockfd, std::string const& command, std::string const& error_msg);
     void ftp_connect_data_channel();
+    void receive_response(int sockfd, std::string& response);
 };
