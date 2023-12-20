@@ -70,7 +70,7 @@ void Client::parse_user_input(std::vector<std::string> args)
     }
 }
 
-void Client::receive_response(int sockfd, std::string& response)
+bool Client::receive_response(int sockfd, std::string& response)
 {
     char buffer[1024];
     int bytes_received = recv(sockfd, buffer, sizeof(buffer) - 1, 0);
@@ -81,6 +81,7 @@ void Client::receive_response(int sockfd, std::string& response)
     buffer[bytes_received] = '\0';
     response = buffer;
     std::cout << "Response: " << response << "\n";
+    return response[0] != '5';
 }
 
 void Client::ftp_connect_data_channel()
@@ -102,7 +103,6 @@ void Client::send_command()
     do_operation(control_socket);
 
     ftp_quit();
-    close(control_socket);
 }
 
 void Client::do_operation(int sockfd)
@@ -119,15 +119,19 @@ void Client::do_operation(int sockfd)
 void Client::ls()
 {
     ftp_pasv(); // Send PASV which sets the port for the data channel
-    ftp_command(control_socket, "LIST", "failed to send LIST");
+    bool ok = ftp_command(control_socket, "LIST " + external_path, "failed to send LIST");
+    if (!ok) {
+        std::cout << "ls failed\n";
+        return;
+    }
+
     ftp_connect_data_channel();
     std::string response;
     receive_response(data_socket, response);
-    std::cout << response << "\n";
-    close(data_socket); // Ensure to close the data socket after use
+    close(data_socket);
 }
 
-void Client::ftp_pasv()
+bool Client::ftp_pasv()
 {
     std::string msg = "PASV \r\n";
     std::cout << msg;
@@ -135,8 +139,15 @@ void Client::ftp_pasv()
 
     std::string response;
     receive_response(control_socket, response);
+    std::cout << response << '\n';
+    // Make sure the response is indicating further action
     data_port = parse_data_port(response);
+    if (data_port == -1) {
+        receive_response(control_socket, response);
+        data_port = parse_data_port(response);
+    }
     std::cout << "port: " << data_port << "\n";
+    return response[0] != '5';
 }
 
 int Client::parse_data_port(std::string const& input)
@@ -144,7 +155,7 @@ int Client::parse_data_port(std::string const& input)
     // Find the position of the last comma
     auto last_pos = input.rfind(',');
     if (last_pos == std::string::npos) {
-        throw std::runtime_error("Invalid format: no comma found");
+        return -1;
     }
 
     // Extract the number after the last comma
@@ -154,7 +165,7 @@ int Client::parse_data_port(std::string const& input)
     // Find the position of the second to last comma
     auto second_pos = input.rfind(',', last_pos - 1);
     if (second_pos == std::string::npos) {
-        throw std::runtime_error("Invalid format: only one comma found");
+        return -1;
     }
 
     // Extract the number before the last comma
@@ -165,7 +176,7 @@ int Client::parse_data_port(std::string const& input)
     return (second << 8) + last;
 }
 
-void Client::ftp_command(int sockfd, std::string const& command, std::string const& error_msg)
+bool Client::ftp_command(int sockfd, std::string const& command, std::string const& error_msg)
 {
 
     std::cout << "Sending " << command << " to FTP server\n";
@@ -183,7 +194,8 @@ void Client::ftp_command(int sockfd, std::string const& command, std::string con
     buffer[bytes_received] = '\0';
 
     std::string response(buffer);
-    std::cout << "Response: " << response << "\n";
+    std::cout << "Response: " << response[0] << "\n";
+    return response[0] != '5';
 }
 
 void Client::ftp_control_command(std::string const& command, std::string const& error_msg)
@@ -244,4 +256,6 @@ void Client::ftp_stru()
 void Client::ftp_quit()
 {
     ftp_control_command("QUIT", "failed to send QUIT");
+    close(data_socket);
+    close(control_socket);
 }
