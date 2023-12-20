@@ -1,10 +1,12 @@
 #include "client.h"
 #include "url.h"
 #include <arpa/inet.h>
+#include <cstring>
 #include <functional>
 #include <iostream>
 #include <map>
 #include <netinet/in.h>
+#include <sstream>
 #include <stdexcept>
 #include <string.h>
 #include <string>
@@ -18,7 +20,8 @@ Client::Client(std::vector<std::string> args)
     std::cout << "Creating client\n";
     operations = {
         { "mkdir", [this]() { this->mkdir(); } },
-        { "rmdir", [this]() { this->rmdir(); } }
+        { "rmdir", [this]() { this->rmdir(); } },
+        { "ls", [this]() { this->ls(); } }
     };
     parse_user_input(args);
 }
@@ -48,10 +51,33 @@ void Client::parse_user_input(std::vector<std::string> args)
     username = url::parse_user(url);
     password = url::parse_pass(url);
     external_path = url::parse_path(url);
-    port = std::stoi(url::parse_port(url).substr(1));
+    control_port = std::stoi(url::parse_port(url).substr(1));
 
     if (host == "" || external_path == "") {
         throw std::runtime_error("invalid url, host and path are required");
+    }
+}
+
+void Client::ftp_connect_data_channel()
+{
+    int data_channel_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (data_channel_fd < 0) {
+        throw std::runtime_error("failed to open socket");
+    }
+
+    data_socket = data_channel_fd;
+
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(data_port);
+    addr.sin_addr.s_addr = inet_addr(host.c_str());
+
+    std::cout << "Connecting to " << host << ":" << data_port << "\n";
+    if (connect(data_channel_fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
+        close(data_channel_fd);
+        std::cerr << strerror(errno) << "\n";
+        throw std::runtime_error("failed to connect to host");
     }
 }
 
@@ -68,10 +94,10 @@ void Client::send_command()
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
+    addr.sin_port = htons(control_port);
     addr.sin_addr.s_addr = inet_addr(host.c_str());
 
-    std::cout << "Connecting to " << host << ":" << port << "\n";
+    std::cout << "Connecting to " << host << ":" << control_port << "\n";
     if (connect(control_channel_fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
         close(control_channel_fd);
         std::cerr << strerror(errno) << "\n";
@@ -99,6 +125,89 @@ void Client::do_operation(int sockfd)
         std::cerr << "Received unknown operation: " << operation << ", ignoring\n"
                   << std::endl;
     }
+}
+
+void Client::ls()
+{
+    ftp_pasv(); // Send PASV which sets the port for the data channel
+    ftp_command(control_socket, "LIST", "failed to send LIST");
+    ftp_connect_data_channel();
+    char buffer[1024];
+    int bytes_received = recv(data_socket, buffer, 1023, 0);
+    buffer[bytes_received] = '\0';
+    std::string response(buffer);
+    std::cout << "Response: " << response << "\n";
+}
+
+void Client::ftp_pasv()
+{
+    std::string msg = "PASV \r\n";
+    std::cout << msg << '\n';
+    send(control_socket, msg.c_str(), msg.length(), 0);
+    char buffer[1024];
+    int bytes_received = recv(control_socket, buffer, 1023, 0);
+    buffer[bytes_received] = '\0';
+    std::string response(buffer);
+    std::cout << "Response: " << response << "\n";
+
+    // Receive next line
+    char buffer2[1024];
+    int bytes_received2 = recv(control_socket, buffer2, 1023, 0);
+    buffer2[bytes_received2] = '\0';
+    response = buffer2;
+    std::cout << "Response: " << response << "\n";
+
+    // Find the port number.
+    data_port = parse_data_port(response);
+    std::cout << "port: " << data_port << "\n";
+}
+
+int Client::parse_data_port(std::string const& input)
+{
+    // Find the position of the last comma
+    auto last_pos = input.rfind(',');
+    if (last_pos == std::string::npos) {
+        throw std::runtime_error("Invalid format: no comma found");
+    }
+
+    // Extract the number after the last comma
+    int last;
+    std::stringstream(input.substr(last_pos + 1)) >> last;
+
+    // Find the position of the second to last comma
+    auto second_pos = input.rfind(',', last_pos - 1);
+    if (second_pos == std::string::npos) {
+        throw std::runtime_error("Invalid format: only one comma found");
+    }
+
+    // Extract the number before the last comma
+    int second;
+    std::stringstream(input.substr(second_pos + 1, last_pos - second_pos - 1)) >> second;
+
+    // Perform the calculation
+    return (second << 8) + last;
+}
+
+void Client::ftp_command(int sockfd, std::string const& command, std::string const& error_msg)
+{
+
+    std::cout << "Sending " << command << " to FTP server\n";
+    std::string msg = command + "\r\n";
+    send(sockfd, msg.c_str(), msg.length(), 0);
+
+    char buffer[1024];
+    std::cout << sockfd << "<< fd\n";
+    int bytes_received = recv(sockfd, buffer, 1023, 0);
+
+    if (bytes_received < 0) {
+        std::cerr << "Error in receiving data: " << strerror(errno) << "\n";
+        throw std::runtime_error("error in receiving data");
+    }
+
+    buffer[bytes_received] = '\0';
+
+    std::string response(buffer);
+    std::cout << "Response: " << response << "\n";
 }
 
 void Client::ftp_control_command(std::string const& command, std::string const& error_msg)
