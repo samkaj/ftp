@@ -208,11 +208,11 @@ void Client::cp()
     bool copy_from = url::is_url(params[1]);
     ftp_pasv();
     if (copy_from) {
-        ftp_retr(external_path);
+        ftp_retr();
         ftp_connect_data_channel();
         cp_from();
     } else {
-        ftp_stor(external_path);
+        ftp_stor();
         ftp_connect_data_channel();
         cp_to();
     }
@@ -264,14 +264,14 @@ void Client::cp_from()
     close(data_socket);
 }
 
-void Client::ftp_stor(std::string const& source)
+void Client::ftp_stor()
 {
-    ftp_control_command("STOR " + source, "failed to send STOR");
+    ftp_control_command("STOR " + external_path, "failed to send STOR");
 }
 
-void Client::ftp_retr(std::string const& source)
+void Client::ftp_retr()
 {
-    ftp_control_command("RETR " + source, "failed to send RETR");
+    ftp_control_command("RETR " + external_path, "failed to send RETR");
 }
 
 void Client::rm()

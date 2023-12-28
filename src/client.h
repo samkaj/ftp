@@ -33,8 +33,8 @@ private:
     void cp_from();
     void rmdir();
     bool ftp_pasv();
-    void ftp_stor(std::string const& source);
-    void ftp_retr(std::string const& source);
+    void ftp_stor();
+    void ftp_retr();
     void ftp_user();
     void ftp_pass();
     void ftp_type();
