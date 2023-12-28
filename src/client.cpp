@@ -14,7 +14,8 @@ Client::Client(std::vector<std::string> args)
         { "mkdir", [this]() { this->mkdir(); } },
         { "rmdir", [this]() { this->rmdir(); } },
         { "ls", [this]() { this->ls(); } },
-        { "cp", [this]() { this->cp(); } }
+        { "cp", [this]() { this->cp(); } },
+        { "rm", [this]() { this->rm(); } }
     };
     parse_user_input(args);
     params = args;
@@ -273,8 +274,9 @@ void Client::ftp_retr(std::string const& source)
     ftp_control_command("RETR " + source, "failed to send RETR");
 }
 
-void Client::ftp_dele(std::string const& path)
+void Client::rm()
 {
+    ftp_control_command("DELE " + external_path, "failed to send DELE");
 }
 
 void Client::mkdir()
