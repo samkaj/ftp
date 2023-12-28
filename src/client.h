@@ -19,6 +19,7 @@ private:
     std::string username;
     std::string password;
     std::string external_path;
+    std::string local_path;
     std::vector<std::string> params;
     std::map<std::string, std::function<void()>> operations;
     void parse_user_input(std::vector<std::string> args);
@@ -26,8 +27,14 @@ private:
     void do_operation(int sockfd);
     void mkdir();
     void ls();
+    void cp();
+    void cp_to();
+    void cp_from();
     void rmdir();
     bool ftp_pasv();
+    void ftp_stor(std::string const& source);
+    void ftp_retr(std::string const& source);
+    void ftp_dele(std::string const& path);
     void ftp_user();
     void ftp_pass();
     void ftp_type();
@@ -36,7 +43,6 @@ private:
     void ftp_quit();
     void create_socket_and_connect(int& sockfd, std::string const& host, int port);
     void ftp_control_command(std::string const& command, std::string const& error_msg);
-    bool ftp_command(int sockfd, std::string const& command, std::string const& error_msg);
     void ftp_connect_data_channel();
     bool receive_response(int sockfd, std::string& response);
 };

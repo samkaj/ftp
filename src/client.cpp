@@ -1,6 +1,7 @@
 #include "client.h"
 #include "url.h"
 #include <arpa/inet.h>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -12,9 +13,11 @@ Client::Client(std::vector<std::string> args)
     operations = {
         { "mkdir", [this]() { this->mkdir(); } },
         { "rmdir", [this]() { this->rmdir(); } },
-        { "ls", [this]() { this->ls(); } }
+        { "ls", [this]() { this->ls(); } },
+        { "cp", [this]() { this->cp(); } }
     };
     parse_user_input(args);
+    params = args;
 }
 
 void Client::create_socket_and_connect(int& sockfd, std::string const& host, int port)
@@ -52,11 +55,18 @@ void Client::parse_user_input(std::vector<std::string> args)
         throw std::runtime_error("no url specified");
     }
 
-    std::string url = args[0];
+    std::string url = "";
     std::cout << "Parsing url: " << url << "\n";
-    if (url == "" || !url::is_url(url)) {
-        std::cerr << "invalid url: \"" << url << "\"\n";
-        throw std::runtime_error("invalid url");
+    for (auto& arg : args) {
+        if (arg == "" || !url::is_url(arg)) {
+            local_path = arg;
+            continue;
+        }
+        url = arg;
+    }
+
+    if (url == "") {
+        throw std::runtime_error("no valid url found");
     }
 
     host = url::parse_host(url);
@@ -119,12 +129,7 @@ void Client::do_operation(int sockfd)
 void Client::ls()
 {
     ftp_pasv(); // Send PASV which sets the port for the data channel
-    bool ok = ftp_command(control_socket, "LIST " + external_path, "failed to send LIST");
-    if (!ok) {
-        std::cout << "ls failed\n";
-        return;
-    }
-
+    ftp_control_command("LIST " + external_path, "failed to send LIST");
     ftp_connect_data_channel();
     std::string response;
     receive_response(data_socket, response);
@@ -176,30 +181,9 @@ int Client::parse_data_port(std::string const& input)
     return (second << 8) + last;
 }
 
-bool Client::ftp_command(int sockfd, std::string const& command, std::string const& error_msg)
-{
-
-    std::cout << "Sending " << command << " to FTP server\n";
-    std::string msg = command + "\r\n";
-    send(sockfd, msg.c_str(), msg.length(), 0);
-
-    char buffer[1024];
-    int bytes_received = recv(sockfd, buffer, 1023, 0);
-
-    if (bytes_received < 0) {
-        std::cerr << "Error in receiving data: " << strerror(errno) << "\n";
-        throw std::runtime_error("error in receiving data");
-    }
-
-    buffer[bytes_received] = '\0';
-
-    std::string response(buffer);
-    std::cout << "Response: " << response[0] << "\n";
-    return response[0] != '5';
-}
-
 void Client::ftp_control_command(std::string const& command, std::string const& error_msg)
 {
+
     std::cout << "Sending " << command << " to FTP server\n";
     std::string msg = command + "\r\n";
     send(control_socket, msg.c_str(), msg.length(), 0);
@@ -216,6 +200,81 @@ void Client::ftp_control_command(std::string const& command, std::string const& 
 
     std::string response(buffer);
     std::cout << "Response: " << response << "\n";
+}
+
+void Client::cp()
+{
+    bool copy_from = url::is_url(params[1]);
+    ftp_pasv();
+    if (copy_from) {
+        ftp_retr(external_path);
+        ftp_connect_data_channel();
+        cp_from();
+    } else {
+        ftp_stor(external_path);
+        ftp_connect_data_channel();
+        cp_to();
+    }
+}
+
+void Client::cp_to()
+{
+    std::ifstream file(local_path);
+    if (!file) {
+        std::cerr << "Failed to open file\n";
+        return;
+    }
+
+    char buffer[1024];
+    while (file.read(buffer, sizeof(buffer) || file.gcount())) {
+        int bytes_read = file.gcount();
+        int sent = send(data_socket, buffer, bytes_read, 0);
+        if (sent < 0) {
+            std::cerr << "Failed to send data\n";
+            break;
+        }
+    }
+
+    file.close();
+    close(data_socket);
+}
+
+void Client::cp_from()
+{
+    std::cout << "local: " << local_path << "\n";
+    std::ofstream file(local_path);
+    if (!file) {
+        std::cerr << "Failed to open file for writing\n";
+        return;
+    }
+
+    int ret;
+    char buffer[1024];
+
+    while ((ret = read(data_socket, buffer, sizeof(buffer))) > 0) {
+        file.write(buffer, ret);
+    }
+
+    if (ret < 0) {
+        std::cerr << "Error reading from socket\n";
+    }
+
+    file.close();
+    close(data_socket);
+}
+
+void Client::ftp_stor(std::string const& source)
+{
+    ftp_control_command("STOR " + source, "failed to send STOR");
+}
+
+void Client::ftp_retr(std::string const& source)
+{
+    ftp_control_command("RETR " + source, "failed to send RETR");
+}
+
+void Client::ftp_dele(std::string const& path)
+{
 }
 
 void Client::mkdir()
